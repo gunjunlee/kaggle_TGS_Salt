@@ -63,7 +63,7 @@ class Unet(nn.Module):
     def __init__(self):
         super(Unet, self).__init__()
         self.pool = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
-        self.down1 = Downsample_block(3, 64, 64)
+        self.down1 = Downsample_block(1, 64, 64)
         self.down2 = Downsample_block(64, 128, 128)
         self.down3 = Downsample_block(128, 256, 256)
         self.down4 = Downsample_block(256, 512, 512)

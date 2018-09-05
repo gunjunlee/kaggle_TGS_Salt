@@ -13,24 +13,21 @@ import os
 import time
 import random
 from utils import *
-from dataloader import Data_loader
+from dataloader import Data_loader, transform
 from net import Unet
 
 VAL_RATIO = 0.1
 BATCH_SIZE = 32
 NUM_PROCESSES = 8
-MEAN, STD = (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
-EPOCHS = 50
+MEAN, STD = (0.480,), (0.1337,)
+EPOCHS = 5
 LEARNING_RATE = 1e-3
 
 if __name__ == '__main__':
-    data_loader = Data_loader()
+    data_loader = {is_train: Data_loader('./data/train', 'images', 'masks',
+         is_train=='train', VAL_RATIO, transform) for is_train in ['train', 'val']}
 
-    data_loader.make_file_list('./data/train/', '.jpg', '_mask.gif')
-
-    print('train size: {} \t val_size: {}'
-        .format(data_loader.train_size, data_loader.val_size))
-
+    pdb.set_trace()
     net = Unet().cuda()
     net = nn.DataParallel(net, [0, 1])
     criterion = nn.CrossEntropyLoss()
@@ -54,6 +51,7 @@ if __name__ == '__main__':
                                                           batch_size=BATCH_SIZE,
                                                           num_processes=NUM_PROCESSES)
         total = ceil(data_loader.train_size/BATCH_SIZE)
+        
         for batch_orig, batch_mask in tqdm(gen_batch, total=total):
             scheduler.step()
             optimizer.zero_grad()

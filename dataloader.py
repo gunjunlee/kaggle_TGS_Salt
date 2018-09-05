@@ -1,46 +1,48 @@
 import os
 import torch
 import numpy as np
-from multiprocessing import Pool
-from itertools import repeat
-from functools import partial
+import torch
+import torch.utils.data
 from PIL import Image
+from math import ceil
 
-class Data_loader:
-    def __init__(self):
-        self.train_list = []
-        self.val_list = []
-        self.train_size = []
-        self.val_size = []
+class Data_loader(torch.utils.data.Dataset):
+    def __init__(self, dir_root, dir_image, dir_mask, is_train, val_rate, transform=None):
+        self.dir_root = dir_root
+        self.dir_image = dir_image
+        self.dir_mask = dir_mask
+        self.is_train = is_train
+        self.val_rate = val_rate
+        self.transform = transform
+        self.file_list = []
         
-    def make_file_list(self, dir_path, ext_orig, ext_mask, val_rate=0.8, shuffle=True):
-        file_list = []
-        for path, _, files in os.walk(os.path.join(dir_path, 'images')):
+        for path, _, files in os.walk(os.path.join(dir_root, dir_image)):
             for file_ in files:
-                name, ext = os.path.splitext(file_)
-                file_list.append((name + ext_orig, name + ext_mask))
-        cutline = int(len(file_list) * val_rate)
-        self.train_list, self.val_list = file_list[:-cutline], file_list[-cutline:]
-        self.train_size, self.val_size = len(self.train_list), len(self.val_list)
-        return self
+                self.file_list.append(file_)
 
-    def make_batch_from_file_list(self, path_prefix, path_orig, path_mask, is_train=True, batch_size=1,  num_processes=1):
-        p = Pool(num_processes)
-
-        if is_train:
-            file_list = self.train_list
+        cut = ceil(len(self) * val_rate)
+        if self.is_train:
+            self.file_list = self.file_list[:-cut]
         else:
-            file_list = self.train_list
+            self.file_list = self.file_list[-cut:]
 
-        for i in range(0, len(file_list), batch_size):
-            batch_orig = p.map(partial(self.make_batch_orig, path_prefix=path_prefix, path_orig=path_orig), file_list[i:i+batch_size])
-            batch_mask = p.map(partial(self.make_batch_mask, path_prefix=path_prefix, path_mask=path_mask), file_list[i:i+batch_size])
-            yield np.array(batch_orig), np.array(batch_mask)
-            
-    def make_batch_orig(self, file_, path_prefix, path_orig):
-        orig = np.array(Image.open(os.path.join(path_prefix, path_orig, file_[0])).resize((224, 224), resample=Image.NEAREST))
-        return orig
+    def __len__(self):
+        return len(self.file_list)
 
-    def make_batch_mask(self, file_, path_prefix, path_mask):
-        mask = np.array(Image.open(os.path.join(path_prefix, path_mask, file_[1])).resize((224, 224), resample=Image.NEAREST))
-        return mask
+    def __getitem__(self, idx):
+        image = Image.open(os.path.join(self.dir_root, self.dir_image, self.file_list[idx]))
+        mask = Image.open(os.path.join(self.dir_root, self.dir_mask, self.file_list[idx]))
+        
+        sample = {'image': image, 'mask': mask}
+
+        if self.transform:
+            sample = self.transform(sample)
+        
+        return sample
+
+
+def transform(sample):
+    image = sample['image']
+    mask = sample['mask']
+    
+    return {'image': image, 'mask': mask}

@@ -4,6 +4,8 @@ import numpy as np
 from PIL import Image
 
 def normalize(img_batch, mean, std):
+    import pdb
+    pdb.set_trace()
     for t, m, s in zip(img_batch, mean, std):
         t.div_(255).sub_(m).div_(s)
     return img_batch
@@ -18,8 +20,8 @@ def to_tensor_img(img_batch):
         img batch
     
     """
-
-    tensor = torch.FloatTensor(img_batch).permute((0, 3, 1, 2))
+    print(img_batch.shape)
+    tensor = torch.FloatTensor(img_batch).unsqueeze(1)
     return tensor
 
 def to_tensor_mask(mask_batch):
