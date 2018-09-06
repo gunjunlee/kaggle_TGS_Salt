@@ -2,38 +2,14 @@ import os
 import torch
 import numpy as np
 from PIL import Image
+import numpy as np
 
-def normalize(img_batch, mean, std):
-    import pdb
-    pdb.set_trace()
-    for t, m, s in zip(img_batch, mean, std):
-        t.div_(255).sub_(m).div_(s)
-    return img_batch
+import pdb
 
-def to_tensor_img(img_batch):
-    """
-    convert np.ndarray img batch to torch.floattensor
-
-    Parameters
-    ----------
-    img_batch : np.nparray
-        img batch
-    
-    """
-    print(img_batch.shape)
-    tensor = torch.FloatTensor(img_batch).unsqueeze(1)
-    return tensor
-
-def to_tensor_mask(mask_batch):
-    """
-    convert np.ndarray mask batch to torch.floattensor
-
-    Parameters
-    ----------
-    mask_batch : np.nparray
-        mask batch
-    
-    """
-
-    tensor = torch.LongTensor(mask_batch)
-    return tensor
+def rle_encode(im):
+    im = im.transpose()
+    pixels = im.flatten()
+    pixels = np.concatenate([[0], pixels, [0]])
+    runs = np.where(pixels[1:] != pixels[:-1])[0] + 1
+    runs[1::2] -= runs[::2]
+    return ' '.join(str(x) for x in runs)

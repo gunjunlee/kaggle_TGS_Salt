@@ -40,17 +40,22 @@ class Salt_dataset(torch.utils.data.Dataset):
 
         sample = {'image': image, 'mask': mask}
 
-        if self.transform and self.dir_mask:
+        if self.transform:
             sample = self.transform(sample)
         
+        if len(sample) == 1:
+            sample = sample, self.file_list[idx]
+
         return sample
 
 
 def transform(sample):
     sample = totensor(sample)
     sample = normalize(sample, 0.5, 0.2)
-
-    return sample['image'].contiguous(), sample['mask'].contiguous()
+    if sample['mask'] is not None:
+        return sample['image'].contiguous(), sample['mask'].contiguous()
+    else:
+        return sample['image'].contiguous()
 
 def totensor(sample):
     image = sample['image']
@@ -60,7 +65,7 @@ def totensor(sample):
     image = image.view(h, w, 1)
     image = image.permute((2, 0, 1))
     
-    if mask:
+    if mask  is not None:
         mask = torch.ByteTensor(torch.ByteStorage.from_buffer(mask.tobytes())).long().div_(255)
         mask = mask.view(h, w)
 
