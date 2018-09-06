@@ -5,8 +5,9 @@ import torch
 import torch.utils.data
 from PIL import Image
 from math import ceil
+import pdb
 
-class Data_loader(torch.utils.data.Dataset):
+class Salt_dataset(torch.utils.data.Dataset):
     def __init__(self, dir_root, dir_image, dir_mask, is_train, val_rate, transform=None):
         self.dir_root = dir_root
         self.dir_image = dir_image
@@ -30,8 +31,8 @@ class Data_loader(torch.utils.data.Dataset):
         return len(self.file_list)
 
     def __getitem__(self, idx):
-        image = Image.open(os.path.join(self.dir_root, self.dir_image, self.file_list[idx]))
-        mask = Image.open(os.path.join(self.dir_root, self.dir_mask, self.file_list[idx]))
+        image = Image.open(os.path.join(self.dir_root, self.dir_image, self.file_list[idx])).convert("L")
+        mask = Image.open(os.path.join(self.dir_root, self.dir_mask, self.file_list[idx])).convert("L")
         
         sample = {'image': image, 'mask': mask}
 
@@ -42,7 +43,25 @@ class Data_loader(torch.utils.data.Dataset):
 
 
 def transform(sample):
+    sample = totensor(sample)
+    sample = normalize(sample, 0.5, 0.2)
+
+    return sample['image'].contiguous(), sample['mask'].contiguous()
+
+def totensor(sample):
     image = sample['image']
     mask = sample['mask']
-    
+    w, h = image.size
+    image = torch.ByteTensor(torch.ByteStorage.from_buffer(image.tobytes())).float().div_(255)
+    mask = torch.ByteTensor(torch.ByteStorage.from_buffer(mask.tobytes())).long().div_(255)
+    image = image.view(h, w, 1)
+    image = image.permute((2, 0, 1))
+    mask = mask.view(h, w)
+
+    return {'image': image, 'mask': mask}
+
+def normalize(sample, mean, std):
+    image = sample['image']
+    mask = sample['mask']
+    image = (image - mean) / std
     return {'image': image, 'mask': mask}

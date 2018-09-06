@@ -13,89 +13,96 @@ import os
 import time
 import random
 from utils import *
-from dataloader import Data_loader, transform
+from dataloader import Salt_dataset, transform
 from net import Unet
+from metric import dice_loss, iou
+from termcolor import colored
 
 VAL_RATIO = 0.1
 BATCH_SIZE = 32
 NUM_PROCESSES = 8
 MEAN, STD = (0.480,), (0.1337,)
-EPOCHS = 5
+EPOCHS = 50
 LEARNING_RATE = 1e-3
 
 if __name__ == '__main__':
-    data_loader = {is_train: Data_loader('./data/train', 'images', 'masks',
-         is_train=='train', VAL_RATIO, transform) for is_train in ['train', 'val']}
+    dataset = {phase: Salt_dataset('./data/train', 'images', 'masks',
+         phase=='train', VAL_RATIO, transform) for phase in ['train', 'val']}
+    dataloader = {phase: torch.utils.data.DataLoader(dataset[phase],
+         batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
+         for phase in ['train', 'val']}
 
-    pdb.set_trace()
     net = Unet().cuda()
     net = nn.DataParallel(net, [0, 1])
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, weight_decay=5e-4)
     scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=50, eta_min=1e-6)
 
+    min_dice_loss = 1
+
     print("train start")
     for epoch in range(EPOCHS):
+        print('epoch: {}'.format(epoch))
         train_running_loss = 0
+        train_running_dice_loss = 0
         train_running_corrects = 0
+        train_iou = np.zeros(10)
+
         val_running_loss = 0
+        val_running_dice_loss = 0
         val_running_corrects = 0
+        val_iou = np.zeros(10)
 
         # train
         net.train()
-
-        gen_batch = data_loader.make_batch_from_file_list('./data/train/', 
-                                                          'images',
-                                                          'masks',
-                                                          is_train=True,
-                                                          batch_size=BATCH_SIZE,
-                                                          num_processes=NUM_PROCESSES)
-        total = ceil(data_loader.train_size/BATCH_SIZE)
-        
-        for batch_orig, batch_mask in tqdm(gen_batch, total=total):
+        for batch_image, batch_mask in tqdm(dataloader['train']):
             scheduler.step()
             optimizer.zero_grad()
 
-            batch_orig = to_tensor_img(batch_orig).cuda()
-            batch_orig = normalize(batch_orig, MEAN, STD)
-            batch_mask = to_tensor_mask(batch_mask).cuda()
+            batch_image = batch_image.cuda()
+            batch_mask = batch_mask.cuda()
 
             with torch.set_grad_enabled(True):
-                outputs = net(batch_orig)
-                # pdb.set_trace()
+                outputs = net(batch_image)
+                
                 _, preds = torch.max(outputs, dim=1)
-                try:
-                    loss = criterion(outputs, batch_mask)
-                except:
-                    pdb.set_trace()
-                    pass
+
+                loss = criterion(outputs, batch_mask) + dice_loss(outputs, batch_mask)
                 loss.backward()
                 optimizer.step()
             train_running_corrects += torch.sum(preds == batch_mask).item()
-            train_running_loss += loss.item() * batch_orig.size(0)
+            train_running_loss += loss.item() * batch_image.size(0)
+            train_running_dice_loss += dice_loss(outputs, batch_mask).item() * batch_image.size(0)
+            train_iou += iou(outputs, batch_mask) * batch_image.size(0)
 
         # val
         net.eval()
-        
-        gen_batch = data_loader.make_batch_from_file_list('./data/train/', 
-                                                          'images',
-                                                          'masks',
-                                                          is_train=False,
-                                                          batch_size=BATCH_SIZE,
-                                                          num_processes=NUM_PROCESSES)
-        total = ceil(data_loader.val_size/BATCH_SIZE)
-        for batch_orig, batch_mask in tqdm(gen_batch, total=total):
-            batch_orig = to_tensor_img(batch_orig).cuda()
-            batch_orig = normalize(batch_orig, MEAN, STD)
-            batch_mask = to_tensor_mask(batch_mask).cuda()
-            outputs = net(batch_orig)
+        for batch_image, batch_mask in tqdm(dataloader['val']):
+            batch_image = batch_image.cuda()
+            batch_mask = batch_mask.cuda()
+            outputs = net(batch_image)
             _, preds = torch.max(outputs, dim=1)
             val_running_corrects += torch.sum(preds == batch_mask).item()
-            val_running_loss += loss.item() * batch_orig.size(0)
+            val_running_loss += loss.item() * batch_image.size(0)
+            val_running_dice_loss += dice_loss(outputs, batch_mask).item() * batch_image.size(0)
+            val_iou += iou(outputs, batch_mask) * batch_image.size(0)
 
-        print('train loss: {} \t acc: {}'.format(train_running_loss/train_size, train_running_corrects/(train_size*224*224)))
-        print('test loss: {} \t acc: {}'.format(val_running_loss/val_size, val_running_corrects/(val_size*224*224)))
+        print('train loss: {} \t dice loss: {} \t\n iou: {} \t acc: {}'.format(
+            train_running_loss/len(dataset['train']),
+            train_running_dice_loss/len(dataset['train']),
+            train_iou/len(dataset['train']),
+            train_running_corrects/(len(dataset['train'])*101*101)))
 
-    
+        print('val loss: {} \t dice loss: {} \t\n iou: {} \t acc: {}'.format(
+            val_running_loss/len(dataset['val']),
+            val_running_dice_loss/len(dataset['val']),
+            val_iou/len(dataset['val']),
+            val_running_corrects/(len(dataset['val'])*101*101)))
+
+        if val_running_dice_loss/len(dataset['val']) < min_dice_loss:
+            min_dice_loss = val_running_dice_loss/len(dataset['val'])
+            torch.save(net.state_dict(), 'ckpt/unet.pth')
+            print(colored('model saved', 'red'))
+
     print("train end")
         
