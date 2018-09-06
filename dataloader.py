@@ -8,7 +8,7 @@ from math import ceil
 import pdb
 
 class Salt_dataset(torch.utils.data.Dataset):
-    def __init__(self, dir_root, dir_image, dir_mask, is_train, val_rate, transform=None):
+    def __init__(self, dir_root, dir_image='image', dir_mask='mask', is_train=True, val_rate=0.2, transform=None):
         self.dir_root = dir_root
         self.dir_image = dir_image
         self.dir_mask = dir_mask
@@ -21,22 +21,26 @@ class Salt_dataset(torch.utils.data.Dataset):
             for file_ in files:
                 self.file_list.append(file_)
 
-        cut = ceil(len(self) * val_rate)
-        if self.is_train:
-            self.file_list = self.file_list[:-cut]
-        else:
-            self.file_list = self.file_list[-cut:]
+        if self.dir_mask:
+            cut = ceil(len(self) * val_rate)
+            if self.is_train:
+                self.file_list = self.file_list[:-cut]
+            else:
+                self.file_list = self.file_list[-cut:]
 
     def __len__(self):
         return len(self.file_list)
 
     def __getitem__(self, idx):
         image = Image.open(os.path.join(self.dir_root, self.dir_image, self.file_list[idx])).convert("L")
-        mask = Image.open(os.path.join(self.dir_root, self.dir_mask, self.file_list[idx])).convert("L")
-        
+        if self.dir_mask:
+            mask = Image.open(os.path.join(self.dir_root, self.dir_mask, self.file_list[idx])).convert("L")
+        else:
+            mask = None
+
         sample = {'image': image, 'mask': mask}
 
-        if self.transform:
+        if self.transform and self.dir_mask:
             sample = self.transform(sample)
         
         return sample
@@ -53,10 +57,12 @@ def totensor(sample):
     mask = sample['mask']
     w, h = image.size
     image = torch.ByteTensor(torch.ByteStorage.from_buffer(image.tobytes())).float().div_(255)
-    mask = torch.ByteTensor(torch.ByteStorage.from_buffer(mask.tobytes())).long().div_(255)
     image = image.view(h, w, 1)
     image = image.permute((2, 0, 1))
-    mask = mask.view(h, w)
+    
+    if mask:
+        mask = torch.ByteTensor(torch.ByteStorage.from_buffer(mask.tobytes())).long().div_(255)
+        mask = mask.view(h, w)
 
     return {'image': image, 'mask': mask}
 
