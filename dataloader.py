@@ -50,6 +50,8 @@ class Salt_dataset(torch.utils.data.Dataset):
 
 
 def transform(sample):
+    sample = horizontal_flip(sample)
+    smaple = vertical_flip(sample)
 
     sample = totensor(sample)
     sample = normalize(sample, 0.5, 0.2)
@@ -57,6 +59,16 @@ def transform(sample):
         return sample['image'].contiguous(), sample['mask'].contiguous()
     else:
         return sample['image'].contiguous()
+
+def transform_test(sample):
+    
+    sample = totensor(sample)
+    sample = normalize(sample, 0.5, 0.2)
+    if sample['mask'] is not None:
+        return sample['image'].contiguous(), sample['mask'].contiguous()
+    else:
+        return sample['image'].contiguous()
+
 
 def totensor(sample):
     image = sample['image']
@@ -78,12 +90,24 @@ def normalize(sample, mean, std):
     image = (image - mean) / std
     return {'image': image, 'mask': mask}
 
-def horizontal_flop(sample, prob=0.5):
+def horizontal_flip(sample, prob=0.5):
     image = sample['image']
     mask = sample['mask']
 
-    image = image.transpose(Image.FLIP_LEFT_RIGHT)
-    if mask is not None:
-        mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
+    if np.random.random() < prob:
+        image = image.transpose(Image.FLIP_LEFT_RIGHT)
+        if mask is not None:
+            mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
+    
+    return {'image': image, 'mask': mask}
+
+def vertical_flip(sample, prob=0.5):
+    image = sample['image']
+    mask = sample['mask']
+
+    if np.random.random() < prob:
+        image = image.transpose(Image.FLIP_TOP_BOTTOM)
+        if mask is not None:
+            mask = mask.transpose(Image.FLIP_TOP_BOTTOM)
     
     return {'image': image, 'mask': mask}

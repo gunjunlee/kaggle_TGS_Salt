@@ -39,7 +39,7 @@ def iou(pred, target):
         iou_ = coeff.sum(dim=0)/coeff.size(0)
         candidate.append(iou_)
         
-    return np.array(candidate).min()
+    return np.array(candidate)
 
 if __name__ == '__main__':
     a = torch.from_numpy(

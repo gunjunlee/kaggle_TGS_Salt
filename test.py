@@ -7,20 +7,20 @@ from tqdm import tqdm
 
 import pdb
 
-from dataloader import Salt_dataset, transform
-from net import Unet
+from dataloader import Salt_dataset, transform_test
+from models.unet import Unet
 from utils import rle_encode
     
 if __name__ == '__main__':
     dataset = Salt_dataset('./data/test', 'images', None,
-         False, 0, transform=transform)
+         False, 0, transform=transform_test)
     
     dataloader = torch.utils.data.DataLoader(dataset,
          batch_size=1, shuffle=False, num_workers=8)
          
     print('model initalize')
     net = Unet().cuda()
-    net = nn.DataParallel(net, [0, 1])
+    net = nn.DataParallel(net)
     print('model load')
     net.load_state_dict(torch.load('./ckpt/unet.pth'))
     net.eval()
@@ -30,7 +30,7 @@ if __name__ == '__main__':
         for batch_image, batch_name in tqdm(dataloader):
             outputs = net(batch_image)
             outputs = F.softmax(outputs, dim=1)[:,1,:,:]
-            outputs = outputs > 0.95
+            outputs = outputs > 0.50
             # pdb.set_trace()
             for k, v in zip(batch_name, outputs):
                 run  = rle_encode(np.array(v))
