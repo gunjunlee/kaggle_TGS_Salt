@@ -14,7 +14,7 @@ import time
 import random
 from utils import *
 from dataloader import Salt_dataset, transform
-from net import Unet
+from models.unet import Unet
 from metric import dice_loss, iou
 from termcolor import colored
 
@@ -22,8 +22,8 @@ VAL_RATIO = 0.1
 BATCH_SIZE = 32
 NUM_PROCESSES = 8
 MEAN, STD = (0.480,), (0.1337,)
-EPOCHS = 50
-LEARNING_RATE = 1e-3
+EPOCHS = 60
+LEARNING_RATE = 1e-4
 
 if __name__ == '__main__':
     dataset = {phase: Salt_dataset('./data/train', 'images', 'masks',
@@ -33,10 +33,10 @@ if __name__ == '__main__':
          for phase in ['train', 'val']}
 
     net = Unet().cuda()
-    net = nn.DataParallel(net, [0, 1])
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, weight_decay=5e-4)
-    scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=50, eta_min=1e-6)
+    net = nn.DataParallel(net)
+    criterion = nn.BCELoss()
+    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
+    scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=20, eta_min=1e-6)
 
     min_dice_loss = 1
 
@@ -55,8 +55,8 @@ if __name__ == '__main__':
 
         # train
         net.train()
+        scheduler.step()
         for batch_image, batch_mask in tqdm(dataloader['train']):
-            scheduler.step()
             optimizer.zero_grad()
 
             batch_image = batch_image.cuda()
@@ -64,10 +64,12 @@ if __name__ == '__main__':
 
             with torch.set_grad_enabled(True):
                 outputs = net(batch_image)
-                
+                probs = F.softmax(outputs, dim=1)[:,1]
                 _, preds = torch.max(outputs, dim=1)
+                
+                loss = criterion(probs, batch_mask.float())\
+                         + 0.2 * dice_loss(outputs, batch_mask)
 
-                loss = criterion(outputs, batch_mask) + dice_loss(outputs, batch_mask)
                 loss.backward()
                 optimizer.step()
             train_running_corrects += torch.sum(preds == batch_mask).item()
@@ -86,7 +88,8 @@ if __name__ == '__main__':
             val_running_loss += loss.item() * batch_image.size(0)
             val_running_dice_loss += dice_loss(outputs, batch_mask).item() * batch_image.size(0)
             val_iou += iou(outputs, batch_mask) * batch_image.size(0)
-
+        for param_group in optimizer.param_groups:
+            print(param_group['lr'])
         print('train loss: {} \t dice loss: {} \t\n iou: {} \t acc: {}'.format(
             train_running_loss/len(dataset['train']),
             train_running_dice_loss/len(dataset['train']),

@@ -50,6 +50,7 @@ class Salt_dataset(torch.utils.data.Dataset):
 
 
 def transform(sample):
+
     sample = totensor(sample)
     sample = normalize(sample, 0.5, 0.2)
     if sample['mask'] is not None:
@@ -75,4 +76,14 @@ def normalize(sample, mean, std):
     image = sample['image']
     mask = sample['mask']
     image = (image - mean) / std
+    return {'image': image, 'mask': mask}
+
+def horizontal_flop(sample, prob=0.5):
+    image = sample['image']
+    mask = sample['mask']
+
+    image = image.transpose(Image.FLIP_LEFT_RIGHT)
+    if mask is not None:
+        mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
+    
     return {'image': image, 'mask': mask}

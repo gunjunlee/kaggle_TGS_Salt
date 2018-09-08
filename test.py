@@ -25,7 +25,7 @@ if __name__ == '__main__':
     net.load_state_dict(torch.load('./ckpt/unet.pth'))
     net.eval()
 
-    with open('output.csv', 'w') as f:
+    with open('output/result.csv', 'w') as f:
         f.write('id,rle_mask\n')
         for batch_image, batch_name in tqdm(dataloader):
             outputs = net(batch_image)

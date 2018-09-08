@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from math import ceil
 import pdb
 
-
 class Downsample_block(nn.Module):
     def __init__(self, in_planes, planes, out_planes):
         super(Downsample_block, self).__init__()
