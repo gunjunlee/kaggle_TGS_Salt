@@ -23,7 +23,7 @@ BATCH_SIZE = 32
 NUM_PROCESSES = 8
 MEAN, STD = (0.480,), (0.1337,)
 EPOCHS = 360
-LEARNING_RATE = 1e-5
+LEARNING_RATE = 3e-5
 
 if __name__ == '__main__':
     dataset = {phase: Salt_dataset('./data/train', 'images', 'masks',
@@ -36,7 +36,8 @@ if __name__ == '__main__':
     net = nn.DataParallel(net)
     criterion = nn.BCELoss()
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
-    scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=40, eta_min=1e-7)
+    # scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=40, eta_min=1e-7)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
 
     min_iou = 0
 
@@ -55,7 +56,6 @@ if __name__ == '__main__':
 
         # train
         net.train()
-        scheduler.step()
         for batch_image, batch_mask in tqdm(dataloader['train']):
             optimizer.zero_grad()
 
@@ -94,6 +94,8 @@ if __name__ == '__main__':
             val_running_dice_loss += dice_loss(outputs, batch_mask).item() * batch_image.size(0)
             val_iou += iou(outputs, batch_mask) * batch_image.size(0)
 
+        scheduler.step(val_running_loss/len(dataset['val']))
+        
         for param_group in optimizer.param_groups:
             print(param_group['lr'])
         print('train loss: {} \t dice loss: {} \t\n iou: {} \t acc: {}'.format(
@@ -110,7 +112,7 @@ if __name__ == '__main__':
 
         if (val_iou/len(dataset['val'])).max() > min_iou:
             min_iou = (val_iou/len(dataset['val'])).max()
-            torch.save(net.state_dict(), 'ckpt/unet.pth')
+            torch.save(net.state_dict(), 'ckpt/unet2.pth')
             print(colored('model saved', 'red'))
 
     print("train end")
