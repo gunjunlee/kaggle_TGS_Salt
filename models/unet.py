@@ -8,21 +8,27 @@ class Downsample_block(nn.Module):
     def __init__(self, in_planes, planes, out_planes):
         super(Downsample_block, self).__init__()
         self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=(3, 3), padding=(1, 1), bias=True)
+        self.bn1 = nn.BatchNorm2d(planes)
         self.conv2 = nn.Conv2d(planes, out_planes, kernel_size=(3, 3), padding=(1, 1), bias=True)
+        self.bn2 = nn.BatchNorm2d(out_planes)
         self.relu = nn.ReLU()
 
     def forward(self, x):
         x = self.conv1(x)
         x = self.relu(x)
+        # x = self.bn1(x)
         x = self.conv2(x)
         x = self.relu(x)
+        # x = self.bn2(x)
         return x
 
 class Upsample_block(nn.Module):
     def __init__(self, in_planes, h_planes0, h_planes1, out_planes):
         super(Upsample_block, self).__init__()
         self.conv1 = nn.Conv2d(in_planes, h_planes0, kernel_size=(3, 3), padding=(1, 1), bias=True)
+        self.bn1 = nn.BatchNorm2d(h_planes0)
         self.conv2 = nn.Conv2d(h_planes0, h_planes1, kernel_size=(3, 3), padding=(1, 1), bias=True)
+        self.bn2 = nn.BatchNorm2d(h_planes1)
         self.trans_conv = nn.ConvTranspose2d(h_planes1, out_planes, kernel_size=(2, 2), stride=(2, 2), padding=(0, 0), output_padding=(0, 0))
         self.relu = nn.ReLU()
 
@@ -33,8 +39,10 @@ class Upsample_block(nn.Module):
             x = torch.cat([x, y], dim=1)
         x = self.conv1(x)
         x = self.relu(x)
+        # x = self.bn1(x)
         x = self.conv2(x)
         x = self.relu(x)
+        # x = self.bn2(x)
         x = self.trans_conv(x)
         return x
 

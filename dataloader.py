@@ -51,7 +51,8 @@ class Salt_dataset(torch.utils.data.Dataset):
 
 def transform(sample):
     sample = horizontal_flip(sample)
-    smaple = vertical_flip(sample)
+    sample = vertical_flip(sample)
+    sample = upsample(sample)
 
     sample = totensor(sample)
     sample = normalize(sample, 0.5, 0.2)
@@ -61,14 +62,12 @@ def transform(sample):
         return sample['image'].contiguous()
 
 def transform_test(sample):
-    
     sample = totensor(sample)
     sample = normalize(sample, 0.5, 0.2)
     if sample['mask'] is not None:
         return sample['image'].contiguous(), sample['mask'].contiguous()
     else:
         return sample['image'].contiguous()
-
 
 def totensor(sample):
     image = sample['image']
@@ -82,6 +81,13 @@ def totensor(sample):
         mask = torch.ByteTensor(torch.ByteStorage.from_buffer(mask.tobytes())).long().div_(255)
         mask = mask.view(h, w)
 
+    return {'image': image, 'mask': mask}
+
+def upsample(sample):
+    image = sample['image']
+    mask = sample['mask']
+    image = image.resize((128, 128), resample=Image.NEAREST)
+    mask = mask.resize((128, 128), resample=Image.NEAREST)
     return {'image': image, 'mask': mask}
 
 def normalize(sample, mean, std):

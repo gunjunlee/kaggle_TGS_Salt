@@ -36,8 +36,8 @@ if __name__ == '__main__':
     net = nn.DataParallel(net)
     criterion = nn.BCELoss()
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
-    # scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=40, eta_min=1e-7)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
+    scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=40, eta_min=1e-7)
+    # scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
 
     min_iou = 0
 
@@ -94,7 +94,8 @@ if __name__ == '__main__':
             val_running_dice_loss += dice_loss(outputs, batch_mask).item() * batch_image.size(0)
             val_iou += iou(outputs, batch_mask) * batch_image.size(0)
 
-        scheduler.step(val_running_loss/len(dataset['val']))
+        # scheduler.step(val_running_loss/len(dataset['val']))
+        scheduler.step()
         
         for param_group in optimizer.param_groups:
             print(param_group['lr'])
