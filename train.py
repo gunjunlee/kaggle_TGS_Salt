@@ -23,7 +23,7 @@ BATCH_SIZE = 32
 NUM_PROCESSES = 8
 MEAN, STD = (0.480,), (0.1337,)
 EPOCHS = 360
-LEARNING_RATE = 3e-5
+LEARNING_RATE = 1e-3
 
 if __name__ == '__main__':
     dataset = {phase: Salt_dataset('./data/train', 'images', 'masks',
@@ -32,7 +32,7 @@ if __name__ == '__main__':
          batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
          for phase in ['train', 'val']}
 
-    net = Unet().cuda()
+    net = Unet(n_classes=2, in_channels=1).cuda()
     net = nn.DataParallel(net)
     criterion = nn.BCELoss()
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
@@ -61,7 +61,7 @@ if __name__ == '__main__':
 
             batch_image = batch_image.cuda()
             batch_mask = batch_mask.cuda()
-
+            # pdb.set_trace()
             with torch.set_grad_enabled(True):
                 outputs = net(batch_image)
                 probs = F.softmax(outputs, dim=1)[:,1]
@@ -69,7 +69,8 @@ if __name__ == '__main__':
                 
                 loss = criterion(probs, batch_mask.float())\
                          + dice_loss(outputs, batch_mask)
-
+                if loss.item() > 2:
+                    print(colored(loss.item(), 'red'))
                 loss.backward()
                 optimizer.step()
             train_running_corrects += torch.sum(preds == batch_mask).item()
@@ -103,13 +104,13 @@ if __name__ == '__main__':
             train_running_loss/len(dataset['train']),
             train_running_dice_loss/len(dataset['train']),
             train_iou/len(dataset['train']),
-            train_running_corrects/(len(dataset['train'])*101*101)))
+            train_running_corrects/(len(dataset['train'])*128*128)))
 
         print('val loss: {} \t dice loss: {} \t\n iou: {} \t acc: {}'.format(
             val_running_loss/len(dataset['val']),
             val_running_dice_loss/len(dataset['val']),
             val_iou/len(dataset['val']),
-            val_running_corrects/(len(dataset['val'])*101*101)))
+            val_running_corrects/(len(dataset['val'])*128*128)))
 
         if (val_iou/len(dataset['val'])).max() > min_iou:
             min_iou = (val_iou/len(dataset['val'])).max()
