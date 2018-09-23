@@ -3,12 +3,14 @@ import torch
 import numpy as np
 import torch
 import torch.utils.data
+import torchvision
+from torchvision import transforms
 from PIL import Image
 from math import ceil
 import pdb
 
 class Salt_dataset(torch.utils.data.Dataset):
-    def __init__(self, dir_root, dir_image='image', dir_mask='mask', is_train=True, val_rate=0.2, transform=None):
+    def __init__(self, dir_root, dir_image='images', dir_mask='masks', is_train=True, val_rate=0.2, transform=None):
         self.dir_root = dir_root
         self.dir_image = dir_image
         self.dir_mask = dir_mask
@@ -32,88 +34,25 @@ class Salt_dataset(torch.utils.data.Dataset):
         return len(self.file_list)
 
     def __getitem__(self, idx):
-        image = Image.open(os.path.join(self.dir_root, self.dir_image, self.file_list[idx])).convert("L")
-        if self.dir_mask:
-            mask = Image.open(os.path.join(self.dir_root, self.dir_mask, self.file_list[idx])).convert("L")
-        else:
-            mask = None
-
-        sample = {'image': image, 'mask': mask}
+        # pdb.set_trace()
+        image = Image.open(os.path.join(self.dir_root, self.dir_image, self.file_list[idx])).convert('RGB')
+        mask = Image.open(os.path.join(self.dir_root, self.dir_mask, self.file_list[idx])).convert('RGB')
+        image = image.resize((128, 128), resample=Image.NEAREST)
+        mask = mask.resize((128, 128), resample=Image.NEAREST)
+        mask = np.array(mask)[:,:,0]/255
 
         if self.transform:
-            sample = self.transform(sample)
-        
-        if len(sample) == 1:
-            sample = sample, self.file_list[idx]
+            image = self.transform(image)
+        mask = torch.tensor(mask).long()
 
-        return sample
+        return image, mask
 
+if __name__ == '__main__':
+    MEAN, STD = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
 
-def transform(sample):
-    sample = horizontal_flip(sample)
-    sample = vertical_flip(sample)
-    sample = upsample(sample)
-
-    sample = totensor(sample)
-    sample = normalize(sample, 0.5, 0.2)
-    if sample['mask'] is not None:
-        return sample['image'].contiguous(), sample['mask'].contiguous()
-    else:
-        return sample['image'].contiguous()
-
-def transform_test(sample):
-    sample = totensor(sample)
-    sample = normalize(sample, 0.5, 0.2)
-    if sample['mask'] is not None:
-        return sample['image'].contiguous(), sample['mask'].contiguous()
-    else:
-        return sample['image'].contiguous()
-
-def totensor(sample):
-    image = sample['image']
-    mask = sample['mask']
-    w, h = image.size
-    image = torch.ByteTensor(torch.ByteStorage.from_buffer(image.tobytes())).float().div_(255)
-    image = image.view(h, w, 1)
-    image = image.permute((2, 0, 1))
-    
-    if mask  is not None:
-        mask = torch.ByteTensor(torch.ByteStorage.from_buffer(mask.tobytes())).long().div_(255)
-        mask = mask.view(h, w)
-
-    return {'image': image, 'mask': mask}
-
-def upsample(sample):
-    image = sample['image']
-    mask = sample['mask']
-    image = image.resize((128, 128), resample=Image.NEAREST)
-    mask = mask.resize((128, 128), resample=Image.NEAREST)
-    return {'image': image, 'mask': mask}
-
-def normalize(sample, mean, std):
-    image = sample['image']
-    mask = sample['mask']
-    image = (image - mean) / std
-    return {'image': image, 'mask': mask}
-
-def horizontal_flip(sample, prob=0.5):
-    image = sample['image']
-    mask = sample['mask']
-
-    if np.random.random() < prob:
-        image = image.transpose(Image.FLIP_LEFT_RIGHT)
-        if mask is not None:
-            mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
-    
-    return {'image': image, 'mask': mask}
-
-def vertical_flip(sample, prob=0.5):
-    image = sample['image']
-    mask = sample['mask']
-
-    if np.random.random() < prob:
-        image = image.transpose(Image.FLIP_TOP_BOTTOM)
-        if mask is not None:
-            mask = mask.transpose(Image.FLIP_TOP_BOTTOM)
-    
-    return {'image': image, 'mask': mask}
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(MEAN, STD)
+    ])
+    dataset = Salt_dataset('data/train', transform=transform)
+    dataset[1]

@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import torchvision
+from torchvision import transforms
 from torch.optim import lr_scheduler
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,7 +15,7 @@ import os
 import time
 import random
 from utils import *
-from dataloader import Salt_dataset, transform
+from dataloader import Salt_dataset
 from models.unet import Unet
 from metric import dice_loss, iou
 from termcolor import colored
@@ -21,9 +23,14 @@ from termcolor import colored
 VAL_RATIO = 0.1
 BATCH_SIZE = 32
 NUM_PROCESSES = 8
-MEAN, STD = (0.480,), (0.1337,)
-EPOCHS = 360
+MEAN, STD = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+EPOCHS = 120
 LEARNING_RATE = 1e-3
+
+transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize(MEAN, STD)
+])
 
 if __name__ == '__main__':
     dataset = {phase: Salt_dataset('./data/train', 'images', 'masks',
@@ -32,9 +39,9 @@ if __name__ == '__main__':
          batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
          for phase in ['train', 'val']}
 
-    net = Unet(n_classes=2, in_channels=1).cuda()
+    net = Unet(n_classes=1, in_channels=3, is_bn=True).cuda()
     net = nn.DataParallel(net)
-    criterion = nn.BCELoss()
+    criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
     scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=40, eta_min=1e-7)
     # scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
@@ -63,37 +70,32 @@ if __name__ == '__main__':
             batch_mask = batch_mask.cuda()
             # pdb.set_trace()
             with torch.set_grad_enabled(True):
-                outputs = net(batch_image)
-                probs = F.softmax(outputs, dim=1)[:,1]
-                _, preds = torch.max(outputs, dim=1)
-                
-                loss = criterion(probs, batch_mask.float())\
-                         + dice_loss(outputs, batch_mask)
+                outputs = net(batch_image).squeeze(dim=1)
+
+                loss = criterion(outputs, batch_mask.float())
+
                 if loss.item() > 2:
                     print(colored(loss.item(), 'red'))
                 loss.backward()
                 optimizer.step()
-            train_running_corrects += torch.sum(preds == batch_mask).item()
+            train_running_corrects += torch.sum((outputs>0.5) == (batch_mask>0.5)).item()
             train_running_loss += loss.item() * batch_image.size(0)
-            train_running_dice_loss += dice_loss(outputs, batch_mask).item() * batch_image.size(0)
-            train_iou += iou(outputs, batch_mask) * batch_image.size(0)
+            # train_running_dice_loss += dice_loss(outputs, batch_mask).item() * batch_image.size(0)
+            # train_iou += iou(outputs, batch_mask) * batch_image.size(0)
 
         # val
         net.eval()
         for batch_image, batch_mask in tqdm(dataloader['val']):
             batch_image = batch_image.cuda()
             batch_mask = batch_mask.cuda()
-            outputs = net(batch_image)
-            _, preds = torch.max(outputs, dim=1)
-            probs = F.softmax(outputs, dim=1)[:,1]
+            outputs = net(batch_image).squeeze(dim=1)
 
-            loss = criterion(probs, batch_mask.float())\
-                        + dice_loss(outputs, batch_mask)
+            loss = criterion(outputs, batch_mask.float())
 
-            val_running_corrects += torch.sum(preds == batch_mask).item()
+            val_running_corrects += torch.sum((outputs>0.5) == (batch_mask>0.5)).item()
             val_running_loss += loss.item() * batch_image.size(0)
-            val_running_dice_loss += dice_loss(outputs, batch_mask).item() * batch_image.size(0)
-            val_iou += iou(outputs, batch_mask) * batch_image.size(0)
+            # val_running_dice_loss += dice_loss(outputs, batch_mask).item() * batch_image.size(0)
+            # val_iou += iou(outputs, batch_mask) * batch_image.size(0)
 
         # scheduler.step(val_running_loss/len(dataset['val']))
         scheduler.step()
