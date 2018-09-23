@@ -35,20 +35,23 @@ class Salt_dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         # pdb.set_trace()
-        image = Image.open(os.path.join(self.dir_root, self.dir_image, self.file_list[idx])).convert('RGB')
-        mask = Image.open(os.path.join(self.dir_root, self.dir_mask, self.file_list[idx])).convert('RGB')
+        image = Image.open(os.path.join(self.dir_root, self.dir_image, self.file_list[idx])).convert('L')
         image = image.resize((128, 128), resample=Image.NEAREST)
-        mask = mask.resize((128, 128), resample=Image.NEAREST)
-        mask = np.array(mask)[:,:,0]/255
-
+        mask = None
+        if self.dir_mask:
+            mask = Image.open(os.path.join(self.dir_root, self.dir_mask, self.file_list[idx])).convert('L')
+            mask = mask.resize((128, 128), resample=Image.NEAREST)
+            mask = np.array(mask)/255
+            mask = torch.tensor(mask).long()
+        else:
+            mask = self.file_list[idx]
         if self.transform:
             image = self.transform(image)
-        mask = torch.tensor(mask).long()
-
+        
         return image, mask
 
 if __name__ == '__main__':
-    MEAN, STD = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+    MEAN, STD = [0.5], [1]
 
     transform = transforms.Compose([
         transforms.ToTensor(),
