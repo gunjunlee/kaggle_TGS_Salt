@@ -31,7 +31,7 @@ if __name__ == '__main__':
     net = Unet(n_classes=1, in_channels=1, is_bn=True).cuda()
     net = nn.DataParallel(net)
     print('model load')
-    net.load_state_dict(torch.load('./ckpt/unet-bn-inch1.pth'))
+    net.load_state_dict(torch.load('./ckpt/unet-bn-inch1-plateau.pth'))
     net.eval()
     # pdb.set_trace()
     with open('output/result.csv', 'w') as f:

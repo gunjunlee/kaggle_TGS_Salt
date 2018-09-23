@@ -27,8 +27,8 @@ def iou(pred, target):
     smooth = 1e-4
 
     candidate = []
-    for threshold in np.arange(0.5, 1, 0.05):
-        p = F.softmax(pred, dim=1)[:,1,:,:] > threshold
+    for threshold in np.arange(0.0, 1, 0.05):
+        p = torch.sigmoid(pred) > threshold
         p = p.float()
 
         inter = (target*p).sum(dim=2).sum(dim=1)
