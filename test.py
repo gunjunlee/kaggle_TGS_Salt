@@ -15,7 +15,7 @@ from models.unet import Unet
 from models.linknet import LinkNet34
 from utils import rle_encode
     
-MEAN, STD = [0.5], [1]
+MEAN, STD = [0.5, 0.5, 0.5], [1, 1, 1]
 transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize(MEAN, STD)
@@ -29,7 +29,7 @@ if __name__ == '__main__':
          batch_size=1, shuffle=False, num_workers=8)
          
     print('model initalize')
-    net = LinkNet34(num_channels=1, num_classes=1, pretrained=True)
+    net = LinkNet34(num_channels=3, num_classes=1, pretrained=True)
     net = nn.DataParallel(net.cuda())
     print('model load')
     net.load_state_dict(torch.load('./ckpt/unet-bn-inch1-plateau.pth'))
@@ -41,7 +41,7 @@ if __name__ == '__main__':
             outputs = net(batch_image).squeeze(dim=1)
             outputs = torch.sigmoid(outputs)
             # pdb.set_trace()
-            outputs = outputs > 0.65
+            outputs = outputs > 0.50
             # pdb.set_trace()
             for k, v in zip(batch_name, outputs):
                 # pdb.set_trace()

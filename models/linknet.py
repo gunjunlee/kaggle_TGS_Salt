@@ -46,9 +46,11 @@ class LinkNet34(nn.Module):
 
         if num_channels == 3:
             self.firstconv = resnet.conv1
+            print('first conv is from pretrained')
         else:
             self.firstconv = nn.Conv2d(num_channels, 64,
              kernel_size=7, stride=2, padding=3, bias=False)
+            print('first conv isnt from pretrained')
         self.firstbn = resnet.bn1
         self.firstrelu = resnet.relu
         self.firstmaxpool = resnet.maxpool

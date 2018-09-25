@@ -35,7 +35,7 @@ class Salt_dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         # pdb.set_trace()
-        image = Image.open(os.path.join(self.dir_root, self.dir_image, self.file_list[idx])).convert('L')
+        image = Image.open(os.path.join(self.dir_root, self.dir_image, self.file_list[idx]))
         image = image.resize((128, 128), resample=Image.NEAREST)
         mask = None
         if self.dir_mask:

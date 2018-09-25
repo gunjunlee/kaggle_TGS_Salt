@@ -24,7 +24,7 @@ from termcolor import colored
 VAL_RATIO = 0.1
 BATCH_SIZE = 32
 NUM_PROCESSES = 8
-MEAN, STD = [0.5], [1]
+MEAN, STD = [0.5, 0.5, 0.5], [1, 1, 1]
 EPOCHS = 120
 LEARNING_RATE = 1e-3
 
@@ -41,11 +41,11 @@ if __name__ == '__main__':
          for phase in ['train', 'val']}
 
     # net = Unet(n_classes=1, in_channels=1, is_bn=True)
-    net = LinkNet34(num_channels=1, num_classes=1, pretrained=True)
+    net = LinkNet34(num_channels=3, num_classes=1, pretrained=True)
     net = nn.DataParallel(net.cuda())
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
-    scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=40, eta_min=1e-7)
+    scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=40, eta_min=1e-5)
     # scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
 
     min_iou = 100
@@ -77,8 +77,8 @@ if __name__ == '__main__':
                 loss = criterion(outputs, batch_mask.float())\
                     + dice_loss(outputs, batch_mask)
 
-                if loss.item() > 2:
-                    print(colored(loss.item(), 'red'))
+                # if loss.item() > 2:
+                #     print(colored(loss.item(), 'red'))
                 loss.backward()
                 optimizer.step()
             train_running_corrects += torch.sum((outputs>0.5) == (batch_mask>0.5)).item()
