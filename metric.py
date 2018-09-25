@@ -4,12 +4,27 @@ import numpy as np
 import pdb
 
 def dice_loss(pred, target):
+    """calc dice loss btw
+        sigmoid(pred) & target
+    
+    Parameters
+    ----------
+    pred : torch.tensor
+        [N,H,W]
+    target : torch.tensor
+        [N,H,W]
+    
+    Returns
+    -------
+    torch.tensor
+        [N]
+    """
 
     pred = pred.float()
     target = target.float()
     smooth = 1e-4
 
-    p = F.softmax(pred, dim=1)[:,1,:,:]
+    p = torch.sigmoid(pred)
     
     inter = (target*p).sum(dim=2).sum(dim=1)
     dim1 = (p).sum(dim=2).sum(dim=1)
@@ -22,6 +37,7 @@ def dice_loss(pred, target):
     return dice_total
 
 def iou(pred, target):
+    
     pred = pred.float()
     target = target.float()
     smooth = 1e-4
