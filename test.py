@@ -41,13 +41,13 @@ if __name__ == '__main__':
             outputs = net(batch_image).squeeze(dim=1)
             outputs = torch.sigmoid(outputs)
             # pdb.set_trace()
-            outputs = outputs > 0.50
+            outputs = outputs > 0.60
             # pdb.set_trace()
             for k, v in zip(batch_name, outputs):
                 # pdb.set_trace()
                 v = transforms.functional.to_pil_image(v.unsqueeze(dim=0).cpu())\
                     .resize((101,101), resample=Image.NEAREST)
-                run  = rle_encode(np.array(v))
+                run  = rle_encode(np.array(v).transpose())
                 f.write('{},{}\n'.format(k[:-4], run))
 
             pass

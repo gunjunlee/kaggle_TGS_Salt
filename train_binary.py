@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torchvision
-from torchvision import transforms
+from torchvision import transforms, models
 from torch.optim import lr_scheduler
 import numpy as np
 import matplotlib.pyplot as plt
@@ -40,18 +40,16 @@ if __name__ == '__main__':
          batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
          for phase in ['train', 'val']}
 
-    # net = Unet(n_classes=1, in_channels=1, is_bn=True)
-    net = LinkNet34(num_channels=3, num_classes=1, pretrained=True)
+    net = models.resnet18(pretrained=True)
 
     # freezing
-    for parameters in [net.firstconv, net.firstbn, net.firstmaxpool]:
+    for parameters in [net.firstconv, net.firstbn, net.firstmaxpool, net.encoder1]:
         for param in parameters.parameters():
             param.requires_grad = False
 
     net = nn.DataParallel(net.cuda())
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr=LEARNING_RATE)
-    
+    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
     scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=120, eta_min=1e-6)
     # scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
     
@@ -61,14 +59,10 @@ if __name__ == '__main__':
     for epoch in range(EPOCHS):
         print('epoch: {}'.format(epoch))
         train_running_loss = 0
-        train_running_dice_loss = 0
         train_running_corrects = 0
-        train_iou = np.zeros(20)
 
         val_running_loss = 0
-        val_running_dice_loss = 0
         val_running_corrects = 0
-        val_iou = np.zeros(20)
 
         # train
         net.train()
@@ -81,15 +75,12 @@ if __name__ == '__main__':
             with torch.set_grad_enabled(True):
                 outputs = net(batch_image).squeeze(dim=1)
 
-                loss = criterion(outputs, batch_mask.float())\
-                    + dice_loss(outputs, batch_mask)
+                loss = criterion(outputs, batch_mask.all())
 
                 loss.backward()
                 optimizer.step()
             train_running_corrects += torch.sum((outputs>0.5) == (batch_mask>0.5)).item()
             train_running_loss += loss.item() * batch_image.size(0)
-            train_running_dice_loss += dice_loss(outputs, batch_mask).item() * batch_image.size(0)
-            train_iou += iou(outputs, batch_mask) * batch_image.size(0)
 
         # val
         net.eval()
@@ -98,34 +89,28 @@ if __name__ == '__main__':
             batch_mask = batch_mask.cuda()
             outputs = net(batch_image).squeeze(dim=1)
 
-            loss = criterion(outputs, batch_mask.float())\
-                    + dice_loss(outputs, batch_mask)
+            loss = criterion(outputs, batch_mask.all())
 
             val_running_corrects += torch.sum((outputs>0.5) == (batch_mask>0.5)).item()
             val_running_loss += loss.item() * batch_image.size(0)
-            val_running_dice_loss += dice_loss(outputs, batch_mask).item() * batch_image.size(0)
-            val_iou += iou(outputs, batch_mask) * batch_image.size(0)
 
         scheduler.step()
         # scheduler.step(train_running_loss/len(dataset['train']))
         
         for param_group in optimizer.param_groups:
             print(param_group['lr'])
+
         print('train loss: {} \t dice loss: {} \t\n iou: {} \t acc: {}'.format(
             train_running_loss/len(dataset['train']),
-            train_running_dice_loss/len(dataset['train']),
-            train_iou/len(dataset['train']),
             train_running_corrects/(len(dataset['train'])*128*128)))
 
         print('val loss: {} \t dice loss: {} \t\n iou: {} \t acc: {}'.format(
             val_running_loss/len(dataset['val']),
-            val_running_dice_loss/len(dataset['val']),
-            val_iou/len(dataset['val']),
             val_running_corrects/(len(dataset['val'])*128*128)))
 
-        if val_iou.max() > min_iou:
-            min_iou = val_iou.max()
-            torch.save(net.state_dict(), 'ckpt/unet-bn-inch1-plateau.pth')
+        if val_running_loss/len(dataset['val']) < min_iou:
+            min_iou = val_running_loss/len(dataset['val'])
+            torch.save(net.state_dict(), 'ckpt/binary.pth')
             print(colored('model saved', 'red'))
 
     print("train end")

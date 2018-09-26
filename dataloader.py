@@ -41,13 +41,25 @@ class Salt_dataset(torch.utils.data.Dataset):
         if self.dir_mask:
             mask = Image.open(os.path.join(self.dir_root, self.dir_mask, self.file_list[idx])).convert('L')
             mask = mask.resize((128, 128), resample=Image.NEAREST)
-            mask = np.array(mask)/255
-            mask = torch.tensor(mask).long()
         else:
             mask = self.file_list[idx]
+
+        # data augmentation
+        if self.is_train:
+            if np.random.random() < 0.5:
+                mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
+                image = image.transpose(Image.FLIP_LEFT_RIGHT)
+            if np.random.random() < 0.5:
+                mask = mask.transpose(Image.FLIP_TOP_BOTTOM)
+                image = image.transpose(Image.FLIP_TOP_BOTTOM)
+            
+
         if self.transform:
             image = self.transform(image)
-        
+        if self.dir_mask:
+            mask = np.array(mask)/255
+            mask = torch.tensor(mask).long()
+
         return image, mask
 
 if __name__ == '__main__':
