@@ -58,7 +58,7 @@ class Salt_dataset(torch.utils.data.Dataset):
             image = self.transform(image)
         if self.dir_mask:
             mask = np.array(mask)/255
-            mask = torch.tensor(mask).long()
+            mask = (torch.tensor(mask)>0.5).long()
 
         return image, mask
 

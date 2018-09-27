@@ -20,6 +20,7 @@ from models.unet import Unet
 from models.linknet import LinkNet34
 from metric import dice_loss, iou
 from termcolor import colored
+from lovasz_losses import lovasz_hinge
 
 VAL_RATIO = 0.1
 BATCH_SIZE = 32
@@ -81,8 +82,10 @@ if __name__ == '__main__':
             with torch.set_grad_enabled(True):
                 outputs = net(batch_image).squeeze(dim=1)
 
-                loss = criterion(outputs, batch_mask.float())\
-                    + dice_loss(outputs, batch_mask)
+                if epoch < 10:
+                    loss = criterion(outputs, batch_mask.float())
+                else:
+                    loss = lovasz_hinge(outputs, batch_mask)
 
                 loss.backward()
                 optimizer.step()

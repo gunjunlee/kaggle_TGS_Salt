@@ -53,7 +53,7 @@ def iou(pred, target):
 
         coeff = (inter + smooth) / (dim1 + dim2 - inter + smooth)
         iou_ = coeff.sum(dim=0)/coeff.size(0)
-        candidate.append(iou_)
+        candidate.append(iou_.item())
         
     return np.array(candidate)
 

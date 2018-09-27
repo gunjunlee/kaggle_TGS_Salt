@@ -15,7 +15,7 @@ from models.unet import Unet
 from models.linknet import LinkNet34
 from utils import rle_encode
     
-MEAN, STD = [0.5, 0.5, 0.5], [1, 1, 1]
+MEAN, STD = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
 transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize(MEAN, STD)
@@ -41,7 +41,7 @@ if __name__ == '__main__':
             outputs = net(batch_image).squeeze(dim=1)
             outputs = torch.sigmoid(outputs)
             # pdb.set_trace()
-            outputs = outputs > 0.60
+            outputs = outputs > 0.30
             # pdb.set_trace()
             for k, v in zip(batch_name, outputs):
                 # pdb.set_trace()
