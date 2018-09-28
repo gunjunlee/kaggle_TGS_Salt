@@ -33,11 +33,22 @@ transform = transforms.Compose([
     transforms.Normalize(MEAN, STD)
 ])
 
+class BCELoss2d(nn.Module):
+    def __init__(self, weight=None, size_average=True):
+        super(BCELoss2d, self).__init__()
+        self.bce_loss = nn.BCELoss(weight, size_average)
+
+    def forward(self, logits, targets):
+        probs        = torch.sigmoid(logits)
+        probs_flat   = probs.view (-1)
+        targets_flat = targets.view(-1)
+        return self.bce_loss(probs_flat, targets_flat)
+
 if __name__ == '__main__':
     dataset = {phase: Salt_dataset('./data/train', 'images', 'masks',
-         phase=='train', VAL_RATIO, transform, (256, 256)) for phase in ['train', 'val']}
+         phase=='train', VAL_RATIO, transform) for phase in ['train', 'val']}
     dataloader = {phase: torch.utils.data.DataLoader(dataset[phase],
-         batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
+         batch_size=BATCH_SIZE, shuffle=True, num_workers=32)
          for phase in ['train', 'val']}
 
     # net = Unet(n_classes=1, in_channels=1, is_bn=True)
@@ -49,12 +60,17 @@ if __name__ == '__main__':
     #     for param in parameters.parameters():
     #         param.requires_grad = False
 
+    print('data parallel')
     net = nn.DataParallel(net.cuda())
-    criterion = nn.BCEWithLogitsLoss()
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr=LEARNING_RATE)
+    print('data parallel end')
+    criterion = BCELoss2d()
+    # optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
+    optimizer = optim.SGD(net.parameters(), lr=LEARNING_RATE)
     
-    scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=120, eta_min=1e-6)
-    # scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
+    # net.load_state_dict(torch.load('ckpt/model.pth'))
+
+    # scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=120, eta_min=1e-6)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer)
     
     min_iou = 100
 
@@ -82,8 +98,8 @@ if __name__ == '__main__':
             with torch.set_grad_enabled(True):
                 outputs = net(batch_image).squeeze(dim=1)
 
-                if epoch < 10:
-                    loss = criterion(outputs, batch_mask.float())
+                if epoch < 120:
+                    loss = lovasz_hinge(outputs, batch_mask)
                 else:
                     loss = lovasz_hinge(outputs, batch_mask)
 
@@ -109,8 +125,8 @@ if __name__ == '__main__':
             val_running_dice_loss += dice_loss(outputs, batch_mask).item() * batch_image.size(0)
             val_iou += iou(outputs, batch_mask) * batch_image.size(0)
 
-        scheduler.step()
-        # scheduler.step(train_running_loss/len(dataset['train']))
+        # scheduler.step()
+        scheduler.step(train_running_loss/len(dataset['train']))
         
         for param_group in optimizer.param_groups:
             print(param_group['lr'])
@@ -128,7 +144,7 @@ if __name__ == '__main__':
 
         if val_iou.max() > min_iou:
             min_iou = val_iou.max()
-            torch.save(net.state_dict(), 'ckpt/unet-bn-inch1-plateau.pth')
+            torch.save(net.state_dict(), 'ckpt/model2.pth')
             print(colored('model saved', 'red'))
 
     print("train end")

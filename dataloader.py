@@ -2,6 +2,7 @@ import os
 import torch
 import numpy as np
 import torch
+import torch.nn.functional as F
 import torch.utils.data
 import torchvision
 from torchvision import transforms
@@ -37,27 +38,28 @@ class Salt_dataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         # pdb.set_trace()
         image = Image.open(os.path.join(self.dir_root, self.dir_image, self.file_list[idx]))
-        image = image.resize(self.img_size, resample=Image.NEAREST)
         mask = None
         if self.dir_mask:
             mask = Image.open(os.path.join(self.dir_root, self.dir_mask, self.file_list[idx])).convert('L')
-            mask = mask.resize((128, 128), resample=Image.NEAREST)
         else:
             mask = self.file_list[idx]
 
         # data augmentation
-        if self.is_train:
-            if np.random.random() < 0.5:
-                mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
-                image = image.transpose(Image.FLIP_LEFT_RIGHT)
-            if np.random.random() < 0.5:
-                mask = mask.transpose(Image.FLIP_TOP_BOTTOM)
-                image = image.transpose(Image.FLIP_TOP_BOTTOM)
+        # if self.is_train:
+        #     if np.random.random() < 0.5:
+        #         mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
+        #         image = image.transpose(Image.FLIP_LEFT_RIGHT)
+        #     if np.random.random() < 0.5:
+        #         mask = mask.transpose(Image.FLIP_TOP_BOTTOM)
+        #         image = image.transpose(Image.FLIP_TOP_BOTTOM)
             
 
         if self.transform:
+            image = image.resize((202, 202))
             image = self.transform(image)
+            image = F.pad(image, (27, 27, 27, 27), 'constant', 0)
         if self.dir_mask:
+            mask = mask.resize((128, 128), resample=Image.NEAREST)
             mask = np.array(mask)/255
             mask = (torch.tensor(mask)>0.5).long()
 

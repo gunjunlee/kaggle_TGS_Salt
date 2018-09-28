@@ -6,6 +6,43 @@ import shy
 
 nonlinearity = nn.ReLU
 
+def conv3x3(in_planes, out_planes, stride=1):
+    """3x3 convolution with padding"""
+    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
+                     padding=1, bias=False)
+
+
+class BasicBlock(nn.Module):
+    expansion = 1
+
+    def __init__(self, inplanes, planes, stride=1, downsample=None):
+        super(BasicBlock, self).__init__()
+        self.conv1 = conv3x3(inplanes, planes, stride)
+        self.bn1 = nn.BatchNorm2d(planes)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = conv3x3(planes, planes)
+        self.bn2 = nn.BatchNorm2d(planes)
+        self.downsample = downsample
+        self.stride = stride
+
+    def forward(self, x):
+        residual = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+
+        if self.downsample is not None:
+            residual = self.downsample(x)
+
+        out += residual
+        out = self.relu(out)
+
+        return out
+
 class Decoder(nn.Module):
     def __init__(self, in_channels, channels, out_channels):
         super(Decoder, self).__init__()
@@ -26,7 +63,12 @@ class Custom34(nn.Module):
     def __init__(self, num_classes=1):
         super(Custom34, self).__init__()
 
-        resnet = models.resnet34(pretrained=True)
+        # resnet = models.resnet34(pretrained=True)
+        resnet = models.ResNet(BasicBlock, [3, 4, 6, 3], num_classes=1)
+
+        # self.first = nn.Sequential(
+        #     shy.layer.Conv2d(3, 64, kernel_size=7, padding=3, bn=True, activation='relu'),
+        # )
 
         self.first = nn.Sequential(
             resnet.conv1,
@@ -54,7 +96,8 @@ class Custom34(nn.Module):
 
         # Final Classifier
         self.logit = nn.Sequential(
-            shy.layer.Conv2d(64, 64, kernel_size=3, padding=1, activation='relu'),
+            nn.Dropout2d(p=0.5),
+            shy.layer.Conv2d(320, 64, kernel_size=3, padding=1, activation='relu'),
             shy.layer.Conv2d(64, num_classes, kernel_size=1),
             nn.MaxPool2d(kernel_size=2, stride=2)
         )
@@ -78,14 +121,21 @@ class Custom34(nn.Module):
         d1 = self.decoder1(d2)
 
         # Final Classification
-        f = d1
-        f = F.dropout2d(f, p=0.5)
+        f = torch.cat([
+            d1,
+            F.upsample(d2, scale_factor=2, mode='bilinear', align_corners=False),
+            F.upsample(d3, scale_factor=4, mode='bilinear', align_corners=False),
+            F.upsample(d4, scale_factor=8, mode='bilinear', align_corners=False),
+            F.upsample(d5, scale_factor=16, mode='bilinear', align_corners=False),
+        ], dim=1)
+
+        # f = F.upsample(f, scale_factor=2, mode='bilinear', align_corners=True)
         logit = self.logit(f)
 
         return logit
 
 if __name__ == '__main__':
     net = Custom34()
-    print(net(torch.ones((3, 3, 256, 256))).shape)
+    print(net(torch.ones((3, 3, 128, 128))).shape)
     import pdb
     pdb.set_trace()
