@@ -10,7 +10,7 @@ from math import ceil
 import pdb
 
 class Salt_dataset(torch.utils.data.Dataset):
-    def __init__(self, dir_root, dir_image='images', dir_mask='masks', is_train=True, val_rate=0.2, transform=None):
+    def __init__(self, dir_root, dir_image='images', dir_mask='masks', is_train=True, val_rate=0.2, transform=None, img_size=(128, 128)):
         self.dir_root = dir_root
         self.dir_image = dir_image
         self.dir_mask = dir_mask
@@ -18,6 +18,7 @@ class Salt_dataset(torch.utils.data.Dataset):
         self.val_rate = val_rate
         self.transform = transform
         self.file_list = []
+        self.img_size = img_size
         
         for path, _, files in os.walk(os.path.join(dir_root, dir_image)):
             for file_ in files:
@@ -36,7 +37,7 @@ class Salt_dataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         # pdb.set_trace()
         image = Image.open(os.path.join(self.dir_root, self.dir_image, self.file_list[idx]))
-        image = image.resize((128, 128), resample=Image.NEAREST)
+        image = image.resize(self.img_size, resample=Image.NEAREST)
         mask = None
         if self.dir_mask:
             mask = Image.open(os.path.join(self.dir_root, self.dir_mask, self.file_list[idx])).convert('L')

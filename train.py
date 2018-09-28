@@ -16,8 +16,7 @@ import time
 import random
 from utils import *
 from dataloader import Salt_dataset
-from models.unet import Unet
-from models.linknet import LinkNet34
+from models import Unet, LinkNet34, Custom34
 from metric import dice_loss, iou
 from termcolor import colored
 from lovasz_losses import lovasz_hinge
@@ -36,18 +35,19 @@ transform = transforms.Compose([
 
 if __name__ == '__main__':
     dataset = {phase: Salt_dataset('./data/train', 'images', 'masks',
-         phase=='train', VAL_RATIO, transform) for phase in ['train', 'val']}
+         phase=='train', VAL_RATIO, transform, (256, 256)) for phase in ['train', 'val']}
     dataloader = {phase: torch.utils.data.DataLoader(dataset[phase],
          batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
          for phase in ['train', 'val']}
 
     # net = Unet(n_classes=1, in_channels=1, is_bn=True)
-    net = LinkNet34(num_channels=3, num_classes=1, pretrained=True)
+    # net = LinkNet34(num_channels=3, num_classes=1, pretrained=True)
+    net = Custom34()
 
     # freezing
-    for parameters in [net.firstconv, net.firstbn, net.firstmaxpool]:
-        for param in parameters.parameters():
-            param.requires_grad = False
+    # for parameters in [net.firstconv, net.firstbn, net.firstmaxpool]:
+    #     for param in parameters.parameters():
+    #         param.requires_grad = False
 
     net = nn.DataParallel(net.cuda())
     criterion = nn.BCEWithLogitsLoss()
