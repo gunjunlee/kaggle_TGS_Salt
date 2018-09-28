@@ -16,7 +16,7 @@ import time
 import random
 from utils import *
 from dataloader import Salt_dataset
-from models import Unet, LinkNet34, Custom34
+from models import Unet, LinkNet34, Custom34, ResUnet
 from metric import dice_loss, iou
 from termcolor import colored
 from lovasz_losses import lovasz_hinge
@@ -26,7 +26,7 @@ BATCH_SIZE = 32
 NUM_PROCESSES = 8
 MEAN, STD = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
 EPOCHS = 120
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 1e-2
 
 transform = transforms.Compose([
     transforms.ToTensor(),
@@ -53,7 +53,8 @@ if __name__ == '__main__':
 
     # net = Unet(n_classes=1, in_channels=1, is_bn=True)
     # net = LinkNet34(num_channels=3, num_classes=1, pretrained=True)
-    net = Custom34()
+    # net = Custom34()
+    net = ResUnet()
 
     # freezing
     # for parameters in [net.firstconv, net.firstbn, net.firstmaxpool]:
@@ -64,8 +65,8 @@ if __name__ == '__main__':
     net = nn.DataParallel(net.cuda())
     print('data parallel end')
     criterion = BCELoss2d()
-    # optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
-    optimizer = optim.SGD(net.parameters(), lr=LEARNING_RATE)
+    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
+    # optimizer = optim.SGD(net.parameters(), lr=LEARNING_RATE)
     
     # net.load_state_dict(torch.load('ckpt/model.pth'))
 
@@ -91,15 +92,15 @@ if __name__ == '__main__':
         net.train()
         for batch_image, batch_mask in tqdm(dataloader['train']):
             optimizer.zero_grad()
+            # pdb.set_trace()
 
             batch_image = batch_image.cuda()
             batch_mask = batch_mask.cuda()
-            # pdb.set_trace()
             with torch.set_grad_enabled(True):
                 outputs = net(batch_image).squeeze(dim=1)
 
                 if epoch < 120:
-                    loss = lovasz_hinge(outputs, batch_mask)
+                    loss = criterion(outputs, batch_mask)
                 else:
                     loss = lovasz_hinge(outputs, batch_mask)
 

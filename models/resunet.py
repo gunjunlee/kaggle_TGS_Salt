@@ -135,8 +135,6 @@ class ResUnet(nn.Module):
         self.output = nn.Conv2d(start_neurons, num_classes, kernel_size=1)
 
     def forward(self, x):
-        import pdb
-        pdb.set_trace()
         # encoder
         conv1 = self.conv1(x)
         pool1 = self.pool1(conv1)
